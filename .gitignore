@@ -10,3 +10,5 @@
 *.pyc
 /backend/.venv
 /frontend/node_modules
+.vercel
+/tnp_website/.venv

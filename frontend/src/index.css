@@ -1,42 +1,35 @@
-/* Start Global Rules */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global Rules */
 * {
-  box-sizing: border-box;
+  @apply box-border;
 }
+html,
 body {
+  @apply h-full;
   background-color: #f3f6fd;
   font-family: "Open Sans", sans-serif;
 }
+#root {
+  @apply h-full flex flex-col;
+}
 a {
-  text-decoration: none;
+  @apply no-underline;
 }
 ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.container {
-  padding-left: 15px;
-  padding-right: 15px;
-  margin-left: auto;
-  margin-right: auto;
+  @apply list-none p-0 m-0 font-sans text-black;
 }
 
-/* Small */
-@media (min-width: 768px) {
-  .container {
-    width: 750px;
+@layer utilities {
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar {
+      display: none;
   }
+ /* Hide scrollbar for IE, Edge and Firefox */
+  .no-scrollbar {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
 }
-/* Medium */
-@media (min-width: 992px) {
-  .container {
-    width: 970px;
-  }
 }
-/* Large */
-@media (min-width: 1200px) {
-  .container {
-    width: 1170px;
-  }
-}
-/* End Global Rules */

@@ -1,109 +1,69 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
-import LandingPage from "./Components/LandingPage";
-import LoginPage from "./Components/LoginPage";
-import SignUpPage from "./Components/SignUpPage";
-import CollegeRegistrationPage from "./Components/CollegeRegistrationPage";
 
-export default function App() {
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [isSignUpOpen, setIsSignUpOpen] = useState(false);
-  const [isCollegeRegistrationOpen, setIsCollegeRegistrationOpen] =
-    useState(false);
-  const [colleges, setColleges] = useState([]);
-  const [branches, setBranches] = useState([]);
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import LandingPage from "./Pages/LandingPage/LandingPage";
 
-  useEffect(
-    function () {
-      async function fetchColleges() {
-        try {
-          const response = await axios.get(
-            "http://127.0.0.1:8000/dashboard/api/College/"
-          );
-          setColleges(response.data);
-        } catch (error) {
-          console.error("Error fetching data:", error);
-        }
-      }
-      fetchColleges();
-    },
-    [isSignUpOpen]
-  );
+import LoginPage from "./Pages/Login/LoginPage";
+import SignUpPage from "./Pages/SignUp/SignUpPage";
+import CollegeRegistrationPage from "./Pages/CollegeRegistration/CollegeRegistrationPage";
+import Features from "./Pages/Features/Features";
+import PricingPanel from "./Pages/Pricing/PricingPanel";
+import Team from "./Pages/Team/Team";
+import ForgotPasswordPage from "./Pages/ForgotPassword/ForgotPasswordPage";
+import Dashboard from "./Pages/Dashboard/Dashboard";
+import ProtectedRoute from "./Components/ProtectedRoute/ProtectedRoute";
+import Companies from "./Components/Companies/Companies";
+import AppliedCompanies from "./Components/AppliedCompanies/AppliedCompanies";
+import SharedHrContact from "./Components/ShareHrContact/SharedHrList";
+import ShareCompanyContact from "./Components/ShareCompanyContact/ShareCompanyContact";
+import HrList from "./Components/HrList/HrList";
+import MyHrList from "./Components/MyHrList/MyHrList";
+import Loader from "./Components/Loader/Loader";
 
-  useEffect(
-    function () {
-      async function fetchBranches() {
-        try {
-          const response = await axios.get(
-            "http://127.0.0.1:8000/dashboard/api/Course/"
-          );
-          setBranches(response.data);
-        } catch (error) {
-          console.error("Error fetching data:", error);
-        }
-      }
-      fetchBranches();
-    },
-    [isCollegeRegistrationOpen]
-  );
-
-  function handleLogInPageOpening() {
-    setIsLoginOpen(true);
-    setIsSignUpOpen(false);
-    setIsCollegeRegistrationOpen(false);
-  }
-
-  function handleLogInPageClosing() {
-    setIsLoginOpen(false);
-  }
-
-  function handleSignUpPageOpening() {
-    setIsSignUpOpen(true);
-    setIsLoginOpen(false);
-    setIsCollegeRegistrationOpen(false);
-  }
-
-  function handleLandingPageOpening() {
-    setIsLoginOpen(false);
-    setIsSignUpOpen(false);
-    setIsCollegeRegistrationOpen(false);
-  }
-
-  function handleCollegeRegistrationPageOpening() {
-    setIsCollegeRegistrationOpen(true);
-    setIsLoginOpen(false);
-    setIsSignUpOpen(false);
-  }
-
+function App() {
   return (
-    <>
-      {!isLoginOpen && !isSignUpOpen && !isCollegeRegistrationOpen && (
-        <LandingPage
-          onLogInPageOpening={handleLogInPageOpening}
-          onCollegeRegistrationPageOpening={
-            handleCollegeRegistrationPageOpening
+    <BrowserRouter>
+    <Loader /> {/* Include the Loader component */}
+  
+   <div className="flex flex-col min-h-screen overflow-auto">
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/signup" element={<SignUpPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgotPassword" element={<ForgotPasswordPage />} />
+        <Route
+          path="/collegeRegistration"
+          element={<CollegeRegistrationPage />}
+        />
+        <Route path="/Team" element={<Team />} />
+        <Route path="/Features" element={<Features />} />
+        <Route path="/pricing" element={<PricingPanel />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
           }
-        />
-      )}
-      {isLoginOpen && (
-        <LoginPage
-          onLogInPageClosing={handleLogInPageClosing}
-          onSignUpPageOpening={handleSignUpPageOpening}
-        />
-      )}
-      {isSignUpOpen && (
-        <SignUpPage
-          onLandingPageOpening={handleLandingPageOpening}
-          onLogInPageOpening={handleLogInPageOpening}
-          college={colleges}
-        />
-      )}
-      {isCollegeRegistrationOpen && (
-        <CollegeRegistrationPage
-          onLandingPageOpening={handleLandingPageOpening}
-          branches={branches}
-        />
-      )}
-    </>
+        >
+          <Route index element={<Navigate replace to="companies" />} />
+          <Route path="companies" element={<Companies />}></Route>
+          <Route
+            path="applied-companies"
+            element={<AppliedCompanies />}
+          ></Route>
+          <Route path="share-hr-contact" element={<SharedHrContact />}></Route>
+          <Route
+            path="share-company-contact"
+            element={<ShareCompanyContact />}
+          ></Route>
+          <Route path="hr-list" element={<HrList />}></Route>
+          <Route path="my-hr-list" element={<MyHrList />}></Route>
+        </Route>
+      </Routes>
+ </div>
+
+    </BrowserRouter>
   );
 }
+
+export default App;

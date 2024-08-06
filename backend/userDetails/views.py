@@ -3,6 +3,7 @@ from django.http import HttpResponse
 from django.contrib import messages
 from django.contrib.auth.models import User,auth
 from . forms import createUserForm , CollegeRegistrationForm
+from django.views.decorators.csrf import csrf_exempt
 
 from django.template.loader import render_to_string
 from django.contrib.sites.shortcuts import get_current_site
@@ -19,7 +20,13 @@ from django.urls import reverse_lazy
 from django.contrib.auth.views import PasswordResetView
 from django.contrib.messages.views import SuccessMessageMixin
 
-
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+import json
 # Create your views here.
 
 def activate_email(request, user, to_email):
@@ -31,6 +38,7 @@ def activate_email(request, user, to_email):
         'token': account_activation_token.make_token(user),
         'protocol': 'https' if request.is_secure() else 'http'
     })
+    print(message)
     email = EmailMessage(mail_subject, message, to=[to_email])
     if email.send():
         messages.success(request , "Registered succesfully ! Please confirm your email to login. If you didn't recieve any email, check if you typed your email correctly. ")
@@ -49,31 +57,13 @@ def activate(request, uidb64, token):
         user.is_active = True
         user.save()
         messages.success(request, 'Thank you for your email confirmation. Now you can login your account.')
-        return redirect('login')
+        return redirect('http://localhost:3000/login')
     else:
         messages.error(request, 'Activation link is invalid!')
     
-    return redirect('login')
+    return redirect('http://localhost:3000/login')
     
 
-def register(request):
-    form = createUserForm()
-    if(request.method == 'POST'):
-        form = createUserForm(request.POST)
-        if form.is_valid() :
-            user = form.save(commit = False)
-            user.is_active = False
-            user.save()
-            clg=College.objects.get(name=request.POST.get('college'))
-            user_profile_obj = UserProfile(user = user , role = 1,college = clg)
-            user_profile_obj.save()
-            activate_email(request , user , form.cleaned_data.get('email'))
-            return redirect('login')
-        else:
-            for error in list(form.errors.values()):
-                messages.error(request,error)
-    
-    return render(request, 'userDetails/register.html',{'form':form})
 
 def login(request):
     if(request.method=='POST'):
@@ -165,40 +155,7 @@ def UpdateDetails(request):
     else:
         return redirect('userProfile')
 
-def CollegeRegister(request):
-    form = CollegeRegistrationForm()
-    BRANCH_CHOICES = [course for course in Course.objects.all()]
-    if(request.method=="POST"):
-        form = CollegeRegistrationForm(request.POST)
-        
-        if form.is_valid() :
 
-            user = form.save(commit = False)
-            user.is_active = False
-            user.save()
-            email = form.cleaned_data.get('email')
-            activate_email(request, user, email)
-
-            college_name = form.cleaned_data.get('college1')
-            subdomain = form.cleaned_data.get('subdomain')
-            college_obj = College(name=college_name, subdomain=subdomain, user=user)
-            college_obj.save()
-
-            user_profile_obj = UserProfile(user=user, role=4, college=college_obj)
-            user_profile_obj.save()
-
-            branches = request.POST.getlist('branches')
-            for id in branches:
-                clg_obj = College.objects.get(name = college_name)
-                course_obj = Course.objects.get(id = id)
-                College_course_obj = CollegeCourse(college=clg_obj,course=course_obj)
-                College_course_obj.save()
-            return redirect('login')
-        else:
-            for error in list(form.errors.values()):
-                messages.error(request,error)
-
-    return render(request,'UserDetails/CollegeRegister.html',{'form':form , 'branches':BRANCH_CHOICES})
 
 
 
@@ -214,4 +171,147 @@ class ResetPasswordView(SuccessMessageMixin, PasswordResetView):
 
 
 
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.authtoken.models import Token
+from rest_framework.decorators import api_view
 
+class MyTokenObtainPairView(TokenObtainPairView):
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            refresh = response.data.get('refresh')
+            access = response.data.get('access')
+            if refresh and access:
+                response.set_cookie('refresh_token', refresh, httponly=True, secure=True)
+                response.set_cookie('access_token', access, httponly=True, secure=True)
+            else:
+                return JsonResponse({'detail': 'Token not provided'}, status=status.HTTP_400_BAD_REQUEST)
+        return response
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+class LogoutView(APIView):
+    def post(self, request, *args, **kwargs):
+        try:
+            refresh_token = request.data.get('refresh_token')
+            if not refresh_token:
+                return Response({'detail': 'Refresh token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            
+            response = Response({'detail': 'Logout successful.'}, status=status.HTTP_205_RESET_CONTENT)
+            response.delete_cookie('refresh_token')
+            response.delete_cookie('access_token')
+            
+            return response
+        except TokenError as e:
+            logger.error(f"Token error: {str(e)}")
+            return Response({'detail': 'Invalid refresh token.', 'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Exception: {str(e)}")
+            return Response({'detail': 'An error occurred.', 'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def register(request):
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return Response({"errors": "Invalid JSON"}, status=400)
+
+    #print("Received data: ", data)  # Debug: print the received data
+    form = createUserForm(data)
+    id=0
+    try:
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.is_active = False
+            user.save()
+            id=user.id
+            #print(data.get('college'))
+            clg = College.objects.get(name=data.get('college'))
+            user_profile_obj = UserProfile(user=user, role=1, college=clg)
+            user_profile_obj.save()
+            activate_email(request, user, form.cleaned_data.get('email'))
+            return Response({'detail': 'Registration successful.'}, status=status.HTTP_200_OK)
+        else:
+            errors = form.errors.as_json()
+            return Response({"errors": errors}, status=400)
+    except Exception as e:
+        u = User.objects.get(id = id)
+        u.delete()
+        return Response({'detail': 'An error occurred.', 'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+def CollegeRegister(request):
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return Response({"errors": "Invalid JSON"}, status=400)
+    
+    print("Received data: ", data) 
+    form = CollegeRegistrationForm(data)
+    
+    if form.is_valid():
+        user = form.save(commit=False)
+        user.is_active = False
+        user.save()
+        email = form.cleaned_data.get('email')
+        activate_email(request, user, email)
+
+        college_name = form.cleaned_data.get('college1')
+        subdomain = form.cleaned_data.get('subdomain')
+        college_obj = College(name=college_name, subdomain=subdomain, user=user)
+        college_obj.save()
+
+        user_profile_obj = UserProfile(user=user, role=4, college=college_obj)
+        user_profile_obj.save()
+
+        branches = data.get('selectedBranches', [])
+        for branch_id in branches:
+            course_obj = Course.objects.get(id=branch_id)
+            CollegeCourse.objects.create(college=college_obj, course=course_obj)
+
+        return Response({'detail': 'Registration successful.'}, status=status.HTTP_200_OK)
+    else:
+        print("form not valid")
+        print("Form errors: ", form.errors)
+        return Response({"errors": form.errors}, status=400)
+    
+
+from django.contrib.auth.forms import PasswordResetForm
+from django.utils.translation import gettext_lazy as _
+
+class ResetPasswordAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        print("inAPI")
+        form = PasswordResetForm(request.data)
+       
+        if form.is_valid():
+            print("valid form")
+            form.save(
+                request=request,
+                use_https=request.is_secure(),
+                email_template_name='userDetails/password_reset_email.html',
+                subject_template_name='userDetails/password_reset_subject.txt',
+            )
+            return Response(
+                {"success": _("We've emailed you instructions for setting your password, "
+                              "if an account exists with the email you entered. You should receive them shortly. "
+                              "If you don't receive an email, "
+                              "please make sure you've entered the address you registered with, and check your spam folder.")},
+                status=status.HTTP_200_OK
+            )
+        return Response(form.errors, status=status.HTTP_400_BAD_REQUEST)
